@@ -36,7 +36,7 @@ Default data path:
 data/vn30f1m_1min_from_tick.csv
 ```
 
-Although the default file was built from tick data, the current backtest uses the aggregated 1-minute bars. Therefore, entries are simulated from bar data, and TP/SL touches are approximated using each bar's high and low.
+The current backtest uses the aggregated 1-minute bars. Therefore, entries are simulated from bar data, and TP/SL touches are approximated using each bar's high and low.
 
 This creates an important difference between backtesting and live paper trading:
 
@@ -104,8 +104,8 @@ The idea is that repeated deep RSI readings show pressure has become stretched. 
 
 Momentum logic handles cases where RSI pressure is not reversing yet but is still strong enough to continue. It is checked after recovery because recovery events are considered more specific.
 
-- Momentum long: previous RSI was in the normal zone, current RSI is not weakening, and enough recent bars have shown deep oversold pressure.
-- Momentum short: previous RSI was in the normal zone, current RSI is not strengthening, and enough recent bars have shown deep overbought pressure.
+- Momentum long: Previous RSI was in the normal zone, current RSI is not weakening, and enough recent bars have shown deep oversold pressure.
+- Momentum short: Previous RSI was in the normal zone, current RSI is not strengthening, and enough recent bars have shown deep overbought pressure.
 
 This was added because some profitable moves do not appear as clean recovery patterns. They start as strong RSI pressure and continue before a visible reversal signal appears.
 
@@ -125,34 +125,9 @@ The normal-zone scalp names are historical. The actual order mapping is:
 
 This is intentional because the normal-zone scalp logic is treated as a short-term mean-reversion decision, not a trend-following decision.
 
-### 4.4 Why priority matters
+### 4.4 Paper-trading flow
 
-The code uses `if / elif / else` priority so only one signal is emitted per update. This is intentional. Recovery and momentum are treated as higher-conviction events than normal-zone scalp. The scalp logic is still available, but it should not override a deeper RSI regime signal when ADX says the market is moving strongly.
-
-### 4.5 Where tick data is used in paper trading
-
-The paper-trading code uses tick updates in `paper_trade/state_worker.py` and `paper_trade/executor.py`.
-
-In `paper_trade/state_worker.py`:
-
-- `on_market()` is called for each market-data update.
-- `quote.latest_matched_price` becomes `latest_price`.
-- The current forming 1-minute bar is updated tick by tick:
-  - `high = max(current high, latest price)`
-  - `low = min(current low, latest price)`
-  - `close = latest price`
-- Before the minute closes, temporary indicator values are recomputed from completed bars plus the current forming bar.
-- `build_signal()` is called from this temporary live state.
-- The latest signal and latest price are written to `paper_trade/runtime_state.json`.
-
-In `paper_trade/executor.py`:
-
-- The executor reads `paper_trade/runtime_state.json`.
-- `latest_price` is saved as `latest_worker_price`.
-- If a signal exists, order price is based on `latest_worker_price` when available.
-- Broker-side inventory and PnL are synced separately from the server.
-
-So in the paper-trading implementation, tick data is not a separate indicator. It is used to keep the current bar, live signal state, and order price closer to the live market than waiting only for the completed bar close.
+In paper trading, `paper_trade/state_worker.py` receives live ticks, updates the current 1-minute bar, recomputes the latest indicators, and writes the newest signal to `paper_trade/runtime_state.json`. Then `paper_trade/executor.py` reads that signal, syncs broker inventory and PnL from the server, and places orders using the latest live price when available. In short, the worker decides the signal and the executor sends the trade.
 
 ## 5. Portfolio Logic
 
@@ -201,17 +176,6 @@ A reverse order must both close the current inventory and open the new direction
 
 After the fill, broker inventory becomes short 2 contracts. This is why the executor uses server-side inventory and average price instead of trying to track old individual orders locally.
 
-### 5.5 Why local order history is avoided
-
-Earlier local order tracking could become stale after rejected, canceled, or partially filled orders. The current design relies on broker/server portfolio state for the important trading facts:
-
-- current inventory
-- average entry price
-- current PnL
-- maximum placeable quantity
-
-Local state is still useful for indicators, bars, ATR, RSI, ADX, and runtime signal values, but it should not be the source of truth for position ownership.
-
 ## 6. Risk And Exit Model
 
 The backtest supports TP exits and optional SL exits:
@@ -221,7 +185,7 @@ The backtest supports TP exits and optional SL exits:
 - Long SL: `entry_price - ATR * multiplier`
 - Short SL: `entry_price + ATR * multiplier`
 
-The live paper-trading executor uses broker-side inventory and manages a resting TP limit order. SL is not currently managed as a broker-side resting stop order. This difference is important: Paper-trading losses can be larger than the bar backtest if adverse moves are not actively stopped.
+The live paper-trading executor uses broker-side inventory and manages a resting TP limit order. SL is not currently managed as a broker-side resting stop order.
 
 ## 7. Configuration
 
