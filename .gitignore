@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment / credentials
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Codex / agent metadata
+.agents/
+.codex/
+
+# Runtime state
+backtest/state.json
+backtest/runtime_state.json
+backtest/executor_state.json
+paper_trade/state.json
+paper_trade/runtime_state.json
+paper_trade/executor_state.json
+
+# Generated backtest outputs
+backtest/trades_main49_bar.csv
+backtest/equity_main49_bar.csv
+backtest/*.log
+
+# Optional large/generated data exports
+data/*.tmp
+data/*.bak
